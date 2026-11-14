@@ -1,5 +1,4 @@
 import {
-  applyDecorators,
   Body,
   Controller,
   Delete,
@@ -12,81 +11,86 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiCreatedResponse,
-  ApiInternalServerErrorResponse,
-  ApiNoContentResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiParam,
-  ApiTags,
-} from '@nestjs/swagger';
-import { ErrorResponseDto } from '../common/dto/error-response.dto';
+import { ApiTags } from '@nestjs/swagger';
 import { type PaginatedResult } from '../common/pagination/pagination';
 import { type Task } from '../generated/prisma/client';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { ListTasksQueryDto } from './dto/list-tasks-query.dto';
-import { PaginatedTasksResponseDto, TaskResponseDto } from './dto/task-response.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TasksService } from './tasks.service';
+import {
+  ApiCreateTask,
+  ApiDeleteTask,
+  ApiGetTask,
+  ApiListTasks,
+  ApiUpdateTask,
+} from './tasks.swagger';
 
-/** Shared Swagger metadata for routes addressing a single task by `:id`. */
-const ApiTaskById = (): MethodDecorator =>
-  applyDecorators(
-    ApiParam({ name: 'id', format: 'uuid', description: 'Task identifier' }),
-    ApiNotFoundResponse({ description: 'Task not found', type: ErrorResponseDto }),
-  );
-
+/**
+ * HTTP layer for tasks, mounted at `/api/v1/tasks`.
+ *
+ * Responsibilities are deliberately limited to HTTP concerns: routing, status
+ * codes and wiring the validation pipes. By the time a handler runs, the
+ * global `ValidationPipe` has already transformed and validated the DTOs and
+ * `ParseUUIDPipe` has validated `:id`, so handlers simply delegate to
+ * {@link TasksService}. Errors thrown by the service are formatted by the
+ * global `AllExceptionsFilter`.
+ *
+ * Swagger metadata lives in `tasks.swagger.ts` to keep this class readable.
+ */
 @ApiTags('tasks')
-@ApiBadRequestResponse({ description: 'Invalid input', type: ErrorResponseDto })
-@ApiInternalServerErrorResponse({ description: 'Unexpected error', type: ErrorResponseDto })
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
+  /**
+   * `POST /tasks` – creates a task.
+   * @returns the created task with `201 Created`.
+   */
   @Post()
-  @ApiOperation({ summary: 'Create a task' })
-  @ApiCreatedResponse({ description: 'Task created', type: TaskResponseDto })
+  @ApiCreateTask()
   create(@Body() dto: CreateTaskDto): Promise<Task> {
     return this.tasksService.create(dto);
   }
 
+  /**
+   * `GET /tasks` – lists tasks, optionally filtered by `status` and/or
+   * `assignee`, paginated with `page`/`limit`.
+   * @returns `{ data, meta }` with `200 OK`.
+   */
   @Get()
-  @ApiOperation({
-    summary: 'List tasks',
-    description: 'Paginated list, newest first. `status` and `assignee` filters can be combined.',
-  })
-  @ApiOkResponse({ description: 'Page of tasks', type: PaginatedTasksResponseDto })
+  @ApiListTasks()
   findAll(@Query() query: ListTasksQueryDto): Promise<PaginatedResult<Task>> {
     return this.tasksService.findAll(query);
   }
 
+  /**
+   * `GET /tasks/:id` – returns a single task.
+   * Responds `400` for a malformed UUID and `404` when the task does not exist.
+   */
   @Get(':id')
-  @ApiOperation({ summary: 'Get a task by id' })
-  @ApiTaskById()
-  @ApiOkResponse({ description: 'Task found', type: TaskResponseDto })
+  @ApiGetTask()
   findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Task> {
     return this.tasksService.findOne(id);
   }
 
+  /**
+   * `PATCH /tasks/:id` – partially updates a task (only the provided fields).
+   * Responds `400` for invalid input and `404` when the task does not exist.
+   */
   @Patch(':id')
-  @ApiOperation({
-    summary: 'Partially update a task',
-    description: 'Only the provided fields are changed.',
-  })
-  @ApiTaskById()
-  @ApiOkResponse({ description: 'Task updated', type: TaskResponseDto })
+  @ApiUpdateTask()
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTaskDto): Promise<Task> {
     return this.tasksService.update(id, dto);
   }
 
+  /**
+   * `DELETE /tasks/:id` – deletes a task.
+   * Responds `204 No Content` on success and `404` when the task does not exist.
+   */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a task' })
-  @ApiTaskById()
-  @ApiNoContentResponse({ description: 'Task deleted' })
+  @ApiDeleteTask()
   remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.tasksService.remove(id);
   }
