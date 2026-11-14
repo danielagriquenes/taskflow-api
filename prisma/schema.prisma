@@ -1,0 +1,39 @@
+// Prisma schema for the TaskFlow API.
+// The datasource URL is provided by prisma.config.ts (DATABASE_URL).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+
+  @@map("task_status")
+}
+
+model Task {
+  id          String     @id @default(uuid()) @db.Uuid
+  title       String     @db.VarChar(200)
+  description String?    @db.VarChar(2000)
+  status      TaskStatus @default(PENDING)
+  assignee    String     @db.VarChar(100)
+  dueDate     DateTime   @map("due_date") @db.Timestamptz(3)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // Supports filtering by assignee alone and by assignee + status.
+  @@index([assignee, status])
+  // Supports filtering by status alone.
+  @@index([status])
+  // Supports the default "newest first" ordering of the task list.
+  @@index([createdAt(sort: Desc)])
+  @@map("tasks")
+}
