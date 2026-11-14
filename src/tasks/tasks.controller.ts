@@ -9,9 +9,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
+import { type PaginatedResult } from '../common/pagination/pagination';
 import { type Task } from '../generated/prisma/client';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { ListTasksQueryDto } from './dto/list-tasks-query.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TasksService } from './tasks.service';
 
@@ -25,8 +28,8 @@ export class TasksController {
   }
 
   @Get()
-  findAll(): Promise<Task[]> {
-    return this.tasksService.findAll();
+  findAll(@Query() query: ListTasksQueryDto): Promise<PaginatedResult<Task>> {
+    return this.tasksService.findAll(query);
   }
 
   @Get(':id')
