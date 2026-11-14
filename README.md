@@ -72,8 +72,18 @@ npm run start:dev
 - API: <http://localhost:3000/api/v1/tasks>
 - Swagger UI: <http://localhost:3000/api/docs>
 
-> **¿El puerto 5432 está ocupado** (por ejemplo, por un PostgreSQL instalado localmente)?
-> Define `POSTGRES_PORT=5433` en `.env` y usa ese puerto en `DATABASE_URL` en `.env` y `.env.test`.
+Para comprobar que todo funciona: `npm test` y `npm run test:e2e` (ver [Pruebas](#pruebas)).
+
+### Solución de problemas
+
+| Síntoma                                                                | Causa y solución                                                                                                                                  |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker compose up` falla con _port is already allocated_              | El puerto 5432 lo usa otro PostgreSQL. Define `POSTGRES_PORT=5433` en `.env` y usa `localhost:5433` en `DATABASE_URL` en `.env` y `.env.test`.    |
+| `docker` no responde o _cannot connect to the Docker daemon_           | Docker Desktop no está arrancado. Ábrelo y espera a que el motor esté en marcha.                                                                  |
+| La app termina con _Invalid environment configuration_                 | Falta `.env` o tiene un valor inválido. El mensaje indica qué variable revisar.                                                                   |
+| `npm run test:e2e` falla con _database "taskflow_test" does not exist_ | El volumen se creó antes de que existiera el script de inicialización. Ejecuta `docker compose exec postgres createdb -U taskflow taskflow_test`. |
+| `npm run test:e2e` termina con _Refusing to run e2e tests_             | Salvaguarda activa: la `DATABASE_URL` de `.env.test` no apunta a una base `*_test`.                                                               |
+| _EADDRINUSE: address already in use :::3000_                           | Otro proceso usa el puerto 3000. Cambia `PORT` en `.env`.                                                                                         |
 
 ## Variables de entorno
 
@@ -172,10 +182,25 @@ Prefijo global: **`/api/v1`**. Todas las fechas se aceptan y se devuelven en **I
 | `PATCH`  | `/tasks/:id` | Actualiza parcialmente una tarea | `200 OK`         |
 | `DELETE` | `/tasks/:id` | Elimina una tarea                | `204 No Content` |
 
-> **Windows:** en Windows PowerShell 5.1, `curl` es un alias de `Invoke-WebRequest` y no acepta
-> estas opciones. Usa `curl.exe` (incluido en Windows 10/11) en una sola línea y con comillas dobles
-> escapadas, Git Bash, o directamente Swagger UI. Ejemplo:
-> `curl.exe -X POST http://localhost:3000/api/v1/tasks -H "Content-Type: application/json" -d "{\"title\":\"Demo\",\"assignee\":\"ana.garcia\",\"dueDate\":\"2026-12-31\"}"`
+Los ejemplos con `curl` funcionan en Linux, macOS y Git Bash. En **Windows PowerShell**, `curl` es
+un alias de `Invoke-WebRequest`, y además PowerShell 5.1 rompe las comillas del JSON al pasarlo a
+`curl.exe`. Usa Swagger UI o el comando nativo `Invoke-RestMethod`:
+
+```powershell
+$base = 'http://localhost:3000/api/v1/tasks'
+
+# Crear
+$task = Invoke-RestMethod -Method Post -Uri $base -ContentType 'application/json' `
+  -Body '{"title":"Demo","assignee":"ana.garcia","dueDate":"2026-12-31"}'
+
+# Listar con filtros y paginación
+Invoke-RestMethod "$($base)?status=PENDING&assignee=carmen.lopez&page=1&limit=10"
+
+# Obtener, actualizar y eliminar
+Invoke-RestMethod "$base/$($task.id)"
+Invoke-RestMethod -Method Patch -Uri "$base/$($task.id)" -ContentType 'application/json' -Body '{"status":"COMPLETED"}'
+Invoke-RestMethod -Method Delete -Uri "$base/$($task.id)"
+```
 
 ### Crear una tarea
 
