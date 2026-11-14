@@ -34,6 +34,7 @@ export class TaskResponseDto implements Task {
   updatedAt!: Date;
 }
 
+/** Swagger description of `GET /tasks`: one page of tasks plus pagination metadata. */
 export class PaginatedTasksResponseDto {
   @ApiProperty({ type: [TaskResponseDto] })
   data!: TaskResponseDto[];

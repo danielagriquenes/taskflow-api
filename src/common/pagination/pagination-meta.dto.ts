@@ -1,6 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { type PaginationMeta } from './pagination';
 
+/**
+ * Swagger description of {@link PaginationMeta}. Implementing the interface
+ * keeps the documented shape and the real response type in sync at compile time.
+ */
 export class PaginationMetaDto implements PaginationMeta {
   @ApiProperty({ description: 'Total records matching the filters.', example: 42 })
   total!: number;

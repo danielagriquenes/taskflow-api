@@ -9,6 +9,14 @@ import {
   TASK_TITLE_MAX_LENGTH,
 } from '../tasks.constants';
 
+/**
+ * Body of `POST /tasks`.
+ *
+ * Decorators run in two phases inside the global `ValidationPipe`:
+ * class-transformer first (`@Transform`: trim strings, parse `dueDate`), then
+ * class-validator (`@Is*`). The `@ApiProperty` metadata feeds Swagger only.
+ * `UpdateTaskDto` derives from this class, so rules are defined once.
+ */
 export class CreateTaskDto {
   @ApiProperty({
     description: 'Short summary of the task. Leading/trailing whitespace is trimmed.',

@@ -6,6 +6,14 @@ import { configureApp } from './app.setup';
 import { type EnvironmentVariables } from './config/env.validation';
 import { setupSwagger, SWAGGER_PATH } from './swagger';
 
+/**
+ * Application entry point.
+ *
+ * 1. Creates the Nest app (env validation runs here and aborts on bad config).
+ * 2. Applies the shared HTTP pipeline (`/api/v1` prefix + validation).
+ * 3. Publishes Swagger at `/api/docs`.
+ * 4. Enables graceful shutdown so the database pool is closed on SIGTERM/SIGINT.
+ */
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   configureApp(app);
