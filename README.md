@@ -62,7 +62,10 @@ docker compose up -d
 # 4. Aplicar las migraciones
 npm run db:migrate
 
-# 5. Arrancar en modo desarrollo
+# 5. (Opcional) Cargar el juego de datos de ejemplo: 12 tareas
+npm run db:seed
+
+# 6. Arrancar en modo desarrollo
 npm run start:dev
 ```
 
@@ -121,10 +124,23 @@ npm run db:migrate          # Aplica las migraciones pendientes (prisma migrate 
 npm run db:migrate:status   # Muestra el estado de las migraciones
 npm run db:migrate:dev      # Desarrollo: crea una nueva migración a partir de cambios en el schema
 npm run prisma:generate     # Regenera el cliente tipado en src/generated/prisma
+npm run db:seed             # Carga el juego de datos de ejemplo (idempotente)
 npm run db:studio           # Explorador visual de datos
 ```
 
 Un entorno nuevo reproduce el esquema completo con `docker compose up -d && npm run db:migrate`.
+
+### Datos de ejemplo (seed)
+
+`npm run db:seed` ejecuta [`prisma/seed.ts`](prisma/seed.ts) y carga **12 tareas** con los tres
+estados, cuatro responsables (`ana.garcia`, `luis.martinez`, `carmen.lopez` y `jorge.ruiz`) y
+tareas con y sin descripción. Sirve para probar los filtros y la paginación desde el primer
+momento, por ejemplo con `GET /api/v1/tasks?status=PENDING&assignee=carmen.lopez`, que devuelve
+2 tareas.
+
+- **Idempotente:** cada tarea tiene un UUID fijo y se inserta o actualiza con `upsert`. Ejecutarlo
+  varias veces no duplica filas ni borra las tareas que hayas creado por la API.
+- **Seguro:** se niega a ejecutarse con `NODE_ENV=production`.
 
 > El script de inicialización `docker/postgres/init/01-create-test-database.sh` solo se ejecuta la
 > **primera vez** que se crea el volumen. Si el volumen ya existía, crea la base de pruebas a mano:
