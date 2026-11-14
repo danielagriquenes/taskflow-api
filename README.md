@@ -172,6 +172,11 @@ Prefijo global: **`/api/v1`**. Todas las fechas se aceptan y se devuelven en **I
 | `PATCH`  | `/tasks/:id` | Actualiza parcialmente una tarea | `200 OK`         |
 | `DELETE` | `/tasks/:id` | Elimina una tarea                | `204 No Content` |
 
+> **Windows:** en Windows PowerShell 5.1, `curl` es un alias de `Invoke-WebRequest` y no acepta
+> estas opciones. Usa `curl.exe` (incluido en Windows 10/11) en una sola línea y con comillas dobles
+> escapadas, Git Bash, o directamente Swagger UI. Ejemplo:
+> `curl.exe -X POST http://localhost:3000/api/v1/tasks -H "Content-Type: application/json" -d "{\"title\":\"Demo\",\"assignee\":\"ana.garcia\",\"dueDate\":\"2026-12-31\"}"`
+
 ### Crear una tarea
 
 ```bash
@@ -269,11 +274,48 @@ cliente.
 
 ## Documentación Swagger
 
-- UI interactiva: <http://localhost:3000/api/docs>
-- Especificación OpenAPI en JSON: <http://localhost:3000/api/docs-json>
+Swagger UI es la forma más rápida de explorar y probar la API sin herramientas externas.
 
-Documenta cada endpoint, los DTOs de request (con ejemplos y restricciones), los esquemas de
-respuesta (tarea, página y error), los parámetros de query y los códigos HTTP posibles.
+- **UI interactiva:** <http://localhost:3000/api/docs>
+- **Especificación OpenAPI 3 (JSON):** <http://localhost:3000/api/docs-json>. Se puede importar en
+  Postman, Insomnia o un generador de clientes.
+
+### Qué incluye
+
+| Elemento            | Contenido                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Portada             | Convenciones de la API: prefijo, fechas, paginación, validación, formato de error y códigos                                                                        |
+| Cada operación      | Resumen y descripción del comportamiento (reglas de validación, valores por defecto, casos límite)                                                                 |
+| Parámetros          | `id` (UUID), `status` (desplegable con los valores del enum), `assignee`, `page` y `limit`, con mínimos, máximos y valores por defecto                             |
+| Cuerpos de petición | Ejemplos seleccionables. **POST:** solo obligatorios / todos los campos / payload inválido. **PATCH:** completar / reasignar y reprogramar / borrar la descripción |
+| Respuestas          | Esquema y ejemplo de cada código posible: `200`/`201`/`204`, `400` (con varios ejemplos), `404` y `500`                                                            |
+| Schemas             | `CreateTaskDto`, `UpdateTaskDto`, `TaskResponseDto`, `PaginatedTasksResponseDto`, `PaginationMetaDto`, `ErrorResponseDto` y `TaskStatus`                           |
+
+### Cómo probar un endpoint
+
+1. Arranca la API (`npm run start:dev`) y abre <http://localhost:3000/api/docs>.
+2. Despliega una operación, por ejemplo **POST /api/v1/tasks**. "Try it out" ya viene activado.
+3. En **Examples**, elige un ejemplo de cuerpo (por ejemplo, _Required fields only_) o edítalo.
+4. Pulsa **Execute**. Verás el comando `curl` equivalente, la URL, el código de respuesta, el cuerpo,
+   las cabeceras y la duración de la petición.
+5. Prueba el ejemplo _Invalid payload_ para ver la respuesta `400` con todos los errores de validación.
+6. Copia el `id` de la respuesta y úsalo en **GET / PATCH / DELETE /api/v1/tasks/{id}**.
+
+Con el juego de datos cargado (`npm run db:seed`), prueba **GET /api/v1/tasks** con
+`status=PENDING` y `assignee=carmen.lopez`: devuelve 2 tareas con su `meta` de paginación.
+
+### Dónde se define
+
+- [`src/swagger.ts`](src/swagger.ts): título, versión, la descripción de la portada y las opciones de
+  la UI.
+- [`src/tasks/tasks.swagger.ts`](src/tasks/tasks.swagger.ts): un decorador por operación
+  (`@ApiCreateTask()`, `@ApiListTasks()`, etc.) con los ejemplos y las respuestas. Así el controlador
+  queda limpio.
+- DTOs (`@ApiProperty`): descripción, ejemplo, límites y formato de cada campo. Los límites usan las
+  mismas constantes que la validación, así que la documentación no puede desincronizarse.
+- [`test/swagger.e2e-spec.ts`](test/swagger.e2e-spec.ts): comprueba de forma automática que la UI se
+  sirve, que cada operación documenta sus códigos HTTP y que no hay referencias a schemas
+  inexistentes.
 
 ## Pruebas
 
@@ -292,7 +334,7 @@ npm run test:e2e    # End-to-end (necesitan PostgreSQL en marcha y .env.test)
 - `AllExceptionsFilter`: formato del error, 4xx sin cambios y 500 genérico sin filtraciones.
 - Validación de variables de entorno.
 
-**End-to-end** (`test/*.e2e-spec.ts`, 27 casos): levantan la aplicación completa con el mismo pipeline que
+**End-to-end** (`test/*.e2e-spec.ts`, 30 casos: 27 de la API y 3 de Swagger): levantan la aplicación completa con el mismo pipeline que
 producción (`configureApp`) y la prueban con Supertest contra PostgreSQL real. Cubren la creación
 correcta e incorrecta, la obtención de tareas inexistentes y de UUIDs inválidos, los filtros
 individuales y combinados, la paginación (metadatos, páginas sin solapamiento, parámetros
@@ -327,17 +369,24 @@ src/
 │   └── transformers/           # Trim y conversión estricta de fechas ISO
 └── tasks/
     ├── tasks.module.ts
-    ├── tasks.controller.ts     # Solo HTTP: rutas, pipes y documentación
+    ├── tasks.controller.ts     # Solo HTTP: rutas, códigos de estado y pipes
     ├── tasks.service.ts        # Lógica de negocio y acceso a datos vía Prisma
+    ├── tasks.swagger.ts        # Documentación OpenAPI de cada operación (ejemplos y respuestas)
     ├── tasks.constants.ts      # Límites compartidos por DTOs y esquema
     └── dto/                    # Create, Update, ListQuery y Response
 prisma/
 ├── schema.prisma
+├── seed.ts                     # Juego de datos de ejemplo (idempotente)
 └── migrations/
 test/
 ├── setup/                      # Carga de .env.test, salvaguarda y migraciones
-└── tasks.e2e-spec.ts
+├── tasks.e2e-spec.ts           # Comportamiento de la API contra PostgreSQL real
+└── swagger.e2e-spec.ts         # Contrato OpenAPI publicado
 ```
+
+Las clases y los métodos públicos (servicio, controlador, filtro, helpers y configuración) están
+documentados con **JSDoc**: qué hacen, qué esperan, qué devuelven, qué excepciones lanzan y el
+porqué de las decisiones que no son obvias.
 
 Flujo de una petición: **ValidationPipe** (transforma y valida el DTO) → **Controller** (solo HTTP)
 → **Service** (reglas de negocio) → **PrismaService** (acceso a datos). Cualquier excepción termina
