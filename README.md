@@ -6,6 +6,20 @@ Incluye CRUD completo, filtros combinables por estado y responsable, paginación
 validación estricta de entrada, manejo de errores centralizado, migraciones reales, documentación
 OpenAPI y pruebas unitarias y end-to-end contra una base de datos aislada.
 
+### Requisitos de la prueba técnica
+
+| Requisito                                                                             | Dónde se cumple                                                                                                                                                           |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API REST con Node.js + TypeScript (NestJS o Express)                                  | NestJS 11 con TypeScript en modo estricto                                                                                                                                 |
+| Crear, listar, ver, editar y borrar tareas                                            | `POST`, `GET`, `GET /:id`, `PATCH /:id` y `DELETE /:id` en `/api/v1/tasks` ([referencia](#referencia-de-la-api))                                                          |
+| Título, descripción, estado (pendiente, en curso o hecha), responsable y fecha límite | `title`, `description`, `status` (`PENDING` / `IN_PROGRESS` / `COMPLETED`), `assignee` y `dueDate` ([modelo](#modelo-task-tabla-tasks))                                   |
+| Filtros por estado y por responsable, con paginación                                  | `?status=&assignee=&page=&limit=`, combinables, con metadatos `total/page/limit/totalPages`                                                                               |
+| Validación de datos y errores con los códigos HTTP correctos                          | DTOs con class-validator; `200`, `201`, `204`, `400`, `404` y `500` con un formato de error uniforme ([errores](#formato-de-error))                                       |
+| PostgreSQL o SQLite con migraciones                                                   | PostgreSQL 17 (Docker Compose) y migraciones de Prisma en `prisma/migrations/`                                                                                            |
+| Al menos 3 tests                                                                      | 35 tests unitarios y 30 end-to-end ([pruebas](#pruebas))                                                                                                                  |
+| README: cómo ejecutarlo, decisiones, qué haría con más tiempo y cómo usé la IA        | [Puesta en marcha](#puesta-en-marcha), [Decisiones técnicas](#decisiones-técnicas), [Qué haría con más tiempo](#qué-haría-con-más-tiempo) y [Uso de la IA](#uso-de-la-ia) |
+| Commits a medida que se avanza                                                        | Historial con un commit por hito ([Conventional Commits](https://www.conventionalcommits.org/))                                                                           |
+
 ---
 
 ## Índice
@@ -21,7 +35,8 @@ OpenAPI y pruebas unitarias y end-to-end contra una base de datos aislada.
 9. [Pruebas](#pruebas)
 10. [Arquitectura](#arquitectura)
 11. [Decisiones técnicas](#decisiones-técnicas)
-12. [Posibles mejoras](#posibles-mejoras)
+12. [Uso de la IA](#uso-de-la-ia)
+13. [Qué haría con más tiempo](#qué-haría-con-más-tiempo)
 
 ---
 
@@ -488,7 +503,59 @@ en **AllExceptionsFilter**, que le da un formato uniforme.
 - **`prisma.config.ts` tolerante.** Lee `process.env.DATABASE_URL` sin lanzar error si falta, para
   que `npm ci` (que ejecuta `prisma generate` en `postinstall`) funcione en CI sin base de datos.
 
-## Posibles mejoras
+## Uso de la IA
+
+Desarrollé el proyecto con **Claude Code** (modelo Claude Opus 5.5) dentro de VS Code, como asistente
+de _pair programming_: la IA proponía y escribía código, y yo definía los requisitos, revisaba cada
+hito, decidía y probaba. Los commits en los que participó llevan la línea
+`Co-Authored-By: Claude`.
+
+### Qué le pedí
+
+- Un prompt inicial detallado: el stack (NestJS, Prisma, PostgreSQL, Jest, Swagger), los principios
+  de arquitectura (capas separadas, DTOs, inyección de dependencias, sin abstracciones innecesarias),
+  los requisitos de validación, errores y tests, y una disciplina de Git estricta: un commit por hito,
+  comprobaciones antes de cada commit y nunca reescribir el historial.
+- Que verificara la compatibilidad de las versiones antes de instalar nada.
+- Tras la primera versión: un juego de datos de ejemplo, una documentación Swagger más completa y
+  JSDoc en servicios y métodos, para que otro programador pudiera entender el código.
+- Que no se subiera al repositorio su carpeta de configuración local (`.claude/`).
+
+### Qué acepté
+
+- La arquitectura por capas (controlador → servicio → `PrismaService`) sin capa de repositorio, y el
+  filtro de excepciones global.
+- Las decisiones de versiones que me propuso tras comprobar la compatibilidad, con sus motivos (ver
+  [Decisiones técnicas](#decisiones-técnicas)): NestJS 11 en lugar de 12, Prisma 7.10.1 fijado y
+  TypeScript 5.9.
+- La estrategia de tests: unitarios con Prisma simulado y e2e contra una base `_test` aislada, con una
+  salvaguarda que aborta si la base no es de pruebas.
+
+### Qué corregí
+
+Revisé cada hito y probé el proyecto desde cero, como lo haría alguien que lo descarga por primera
+vez. Eso me permitió detectar cosas que la IA había dado por buenas:
+
+- **Instrucciones que no funcionaban en Windows:** el paso `cp` fallaba en CMD y el ejemplo de
+  `curl` para PowerShell no funcionaba. Se sustituyeron por comandos comprobados.
+- **Seed poco visible:** el paso para cargar los datos de ejemplo estaba marcado como opcional y, sin
+  él, la lista salía vacía sin ninguna pista. Ahora está marcado como recomendado.
+- **Fechas y zonas horarias:** detecté que una fecha sin hora se interpreta como medianoche UTC, lo
+  que en mi zona horaria (UTC−4) la muestra como el día anterior. Lo documenté como mejora.
+- **Documentación insuficiente:** pedí ampliar Swagger y documentar servicios y métodos con JSDoc,
+  porque el código tiene que poder entenderlo otro programador. Al revisar Swagger en el navegador
+  aparecieron esquemas que faltaban, y se corrigieron con un test que lo valida.
+
+Además, antes de cada commit se ejecutaban lint, typecheck, build y tests, lo que permitió detectar a
+tiempo errores como una compilación incompleta, corregida en un commit `fix` aparte.
+
+### Cómo lo verifiqué
+
+Al final cloné el repositorio en una carpeta nueva e hice una prueba completa para comprobar que las instrucciones del README le
+funcionan a otra persona: instalación, Docker, migración, seed, prueba manual de cada endpoint (en
+Swagger y en PowerShell) y ejecución de los tests.
+
+## Qué haría con más tiempo
 
 - Autenticación y autorización (JWT), y un modelo `User` real para `assignee`.
 - Guardar `dueDate` como fecha de calendario (`DATE`, formato `YYYY-MM-DD`) en lugar de
