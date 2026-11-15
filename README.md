@@ -491,6 +491,11 @@ en **AllExceptionsFilter**, que le da un formato uniforme.
 ## Posibles mejoras
 
 - Autenticación y autorización (JWT), y un modelo `User` real para `assignee`.
+- Guardar `dueDate` como fecha de calendario (`DATE`, formato `YYYY-MM-DD`) en lugar de
+  `TIMESTAMPTZ`. Hoy un vencimiento enviado como `2026-11-13` se guarda como medianoche UTC, y un
+  cliente en una zona por detrás de UTC (por ejemplo, UTC−4) lo mostraría como el 12 a las 20:00.
+  Con `DATE` el vencimiento sería el mismo día en cualquier zona horaria. `createdAt` y `updatedAt`
+  seguirían en `TIMESTAMPTZ`, porque sí representan un instante exacto.
 - Búsqueda de responsable sin distinguir mayúsculas (índice sobre `lower(assignee)`) y búsqueda de
   texto en `title`.
 - Ordenación configurable y paginación por cursor para volúmenes grandes.
