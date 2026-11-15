@@ -48,31 +48,73 @@ Las razones de cada versión elegida se explican en [Decisiones técnicas](#deci
 
 ## Puesta en marcha
 
+Ejecuta los pasos en orden desde la carpeta del proyecto. Cada paso indica qué deberías ver.
+
+**1. Instalar dependencias**
+
 ```bash
-# 1. Instalar dependencias (ejecuta `prisma generate` en postinstall)
 npm ci
+```
 
-# 2. Configurar el entorno
-cp .env.example .env
-cp .env.test.example .env.test
+Al terminar se ejecuta `prisma generate`, que crea el cliente tipado en `src/generated/prisma`.
 
-# 3. Levantar PostgreSQL (crea también la base `taskflow_test`)
+**2. Crear los archivos de configuración** a partir de las plantillas (`.env` y `.env.test` no se
+versionan)
+
+| Terminal               | Comandos                                                                |
+| ---------------------- | ----------------------------------------------------------------------- |
+| Linux, macOS, Git Bash | `cp .env.example .env` y `cp .env.test.example .env.test`               |
+| Windows PowerShell     | `Copy-Item .env.example .env` y `Copy-Item .env.test.example .env.test` |
+| Windows CMD            | `copy .env.example .env` y `copy .env.test.example .env.test`           |
+
+Si el puerto 5432 ya está ocupado, consulta [Solución de problemas](#solución-de-problemas).
+
+**3. Levantar PostgreSQL**
+
+```bash
 docker compose up -d
+docker compose ps
+```
 
-# 4. Aplicar las migraciones
+El contenedor `taskflow-postgres` debe aparecer como `healthy`. La primera vez se crean también la
+base `taskflow` y la base de pruebas `taskflow_test`.
+
+**4. Aplicar las migraciones**
+
+```bash
 npm run db:migrate
+```
 
-# 5. (Opcional) Cargar el juego de datos de ejemplo: 12 tareas
+Debe mostrar `All migrations have been successfully applied.`
+
+**5. Cargar el juego de datos de ejemplo (recomendado)**
+
+```bash
 npm run db:seed
+```
 
-# 6. Arrancar en modo desarrollo
+Debe mostrar `Seed completed: 12 sample tasks upserted (12 in total).`
+
+> Sin este paso la API funciona igual, pero la base está vacía y `GET /api/v1/tasks` devuelve
+> `{"data":[],"meta":{"total":0,...}}`.
+
+**6. Arrancar la API**
+
+```bash
 npm run start:dev
 ```
 
-- API: <http://localhost:3000/api/v1/tasks>
-- Swagger UI: <http://localhost:3000/api/docs>
+Debe mostrar `TaskFlow API listening on port 3000`. Después comprueba:
 
-Para comprobar que todo funciona: `npm test` y `npm run test:e2e` (ver [Pruebas](#pruebas)).
+- <http://localhost:3000/api/v1/tasks>: 10 tareas y `"meta":{"total":12,"page":1,"limit":10,"totalPages":2}`.
+- <http://localhost:3000/api/docs>: Swagger UI.
+
+**7. Ejecutar las pruebas (opcional)**
+
+```bash
+npm test            # 35 tests unitarios
+npm run test:e2e    # 30 tests end-to-end (la base taskflow_test se migra sola)
+```
 
 ### Solución de problemas
 
@@ -84,6 +126,8 @@ Para comprobar que todo funciona: `npm test` y `npm run test:e2e` (ver [Pruebas]
 | `npm run test:e2e` falla con _database "taskflow_test" does not exist_ | El volumen se creó antes de que existiera el script de inicialización. Ejecuta `docker compose exec postgres createdb -U taskflow taskflow_test`. |
 | `npm run test:e2e` termina con _Refusing to run e2e tests_             | Salvaguarda activa: la `DATABASE_URL` de `.env.test` no apunta a una base `*_test`.                                                               |
 | _EADDRINUSE: address already in use :::3000_                           | Otro proceso usa el puerto 3000. Cambia `PORT` en `.env`.                                                                                         |
+| `GET /api/v1/tasks` devuelve `"total":0`                               | La base está vacía porque no se cargó el juego de datos. Ejecuta `npm run db:seed` (no hace falta reiniciar la API).                              |
+| `"cp" no se reconoce como un comando…`                                 | Estás en Windows CMD. Usa `copy` (CMD) o `Copy-Item` (PowerShell), como se indica en el paso 2.                                                   |
 
 ## Variables de entorno
 
